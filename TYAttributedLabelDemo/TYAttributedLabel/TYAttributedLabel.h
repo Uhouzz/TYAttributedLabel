@@ -24,6 +24,10 @@ typedef NS_ENUM(NSUInteger, TYVerticalAlignment) {
 
 // 长按代理 有多个状态 begin, changes, end 都会调用,所以需要判断状态
 - (void)attributedLabel:(TYAttributedLabel *)attributedLabel textStorageLongPressed:(id<TYTextStorageProtocol>)textStorage onState:(UIGestureRecognizerState)state atPoint:(CGPoint)point;
+
+// 长按不包含特殊字符串区域
+- (void)attributedLabel:(TYAttributedLabel *)attributedLabel longPressRegionWithoutTextStorageOnState:(UIGestureRecognizerState)state;
+
 @end
 
 /**

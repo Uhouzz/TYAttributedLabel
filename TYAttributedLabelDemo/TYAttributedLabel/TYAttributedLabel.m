@@ -271,21 +271,34 @@ NSString *const kTYTextRunAttributedName = @"TYTextRunAttributedName";
         [drawStorage drawStorageWithRect:rect];
     }];
     
-    if ([_textContainer existRunRectDictionary]) {
-        if (_delegateFlags.textStorageClickedAtPoint) {
-            [self addSingleTapGesture];
-        }else {
-            [self removeSingleTapGesture];
-        }
-        if (_delegateFlags.textStorageLongPressedOnStateAtPoint) {
-            [self addLongPressGesture];
-        }else {
-            [self removeLongPressGesture];
-        }
+    
+    //不含特殊字符照常添加手势
+    if (_delegateFlags.textStorageClickedAtPoint) {
+        [self addSingleTapGesture];
     }else {
         [self removeSingleTapGesture];
+    }
+    if (_delegateFlags.textStorageLongPressedOnStateAtPoint) {
+        [self addLongPressGesture];
+    }else {
         [self removeLongPressGesture];
     }
+    
+//    if ([_textContainer existRunRectDictionary]) {
+//        if (_delegateFlags.textStorageClickedAtPoint) {
+//            [self addSingleTapGesture];
+//        }else {
+//            [self removeSingleTapGesture];
+//        }
+//        if (_delegateFlags.textStorageLongPressedOnStateAtPoint) {
+//            [self addLongPressGesture];
+//        }else {
+//            [self removeLongPressGesture];
+//        }
+//    }else {
+//        [self removeSingleTapGesture];
+//        [self removeLongPressGesture];
+//    }
 }
 
 #pragma mark - add Gesture
@@ -341,7 +354,16 @@ NSString *const kTYTextRunAttributedName = @"TYTextRunAttributedName";
     __typeof (self) __weak weakSelf = self;
     [_textContainer enumerateRunRectContainPoint:point viewHeight:CGRectGetHeight(self.frame) successBlock:^(id<TYTextStorageProtocol> textStorage){
         if (_delegateFlags.textStorageClickedAtPoint) {
-            [_delegate attributedLabel:weakSelf textStorageClicked:textStorage atPoint:point];
+            
+            [_textContainer enumerateLinkRectContainPoint:point viewHeight:CGRectGetHeight(self.frame) successBlock:^(id<TYLinkStorageProtocol> linkStorage) {
+                NSRange curClickLinkRange = linkStorage.realRange;
+                [weakSelf setHighlightLinkWithSaveLinkColor:(linkStorage.textColor ? linkStorage.textColor:weakSelf.textContainer.linkColor) linkRange:curClickLinkRange];
+            }];
+            
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self resetHighLightLink];
+                [_delegate attributedLabel:weakSelf textStorageClicked:textStorage atPoint:point];
+            });
         }
     }];
 }
@@ -351,11 +373,18 @@ NSString *const kTYTextRunAttributedName = @"TYTextRunAttributedName";
     CGPoint point = [sender locationInView:self];
     
     __typeof (self) __weak weakSelf = self;
-    [_textContainer enumerateRunRectContainPoint:point viewHeight:CGRectGetHeight(self.frame) successBlock:^(id<TYTextStorageProtocol> textStorage){
+    BOOL isContained = [_textContainer enumerateRunRectContainPoint:point viewHeight:CGRectGetHeight(self.frame) successBlock:^(id<TYTextStorageProtocol> textStorage){
         if (_delegateFlags.textStorageLongPressedOnStateAtPoint) {
                 [weakSelf.delegate attributedLabel:weakSelf textStorageLongPressed:textStorage onState:sender.state atPoint:point];
         }
     }];
+    
+    //处理不包含特殊字符区域
+    if (!isContained) {
+        if ([self.delegate respondsToSelector:@selector(attributedLabel:longPressRegionWithoutTextStorageOnState:)]) {
+            [self.delegate attributedLabel:self longPressRegionWithoutTextStorageOnState:sender.state];
+        }
+    }
 }
 
 #pragma mark - touches action
@@ -364,6 +393,7 @@ NSString *const kTYTextRunAttributedName = @"TYTextRunAttributedName";
 {
     __block BOOL found = NO;
     if ([_textContainer existLinkRectDictionary]) {
+        
         UITouch *touch = [touches anyObject];
         CGPoint point = [touch locationInView:self];
         
@@ -425,7 +455,9 @@ NSString *const kTYTextRunAttributedName = @"TYTextRunAttributedName";
 {
     [super touchesEnded:touches withEvent:event];
     if ([_textContainer existLinkRectDictionary] && _clickLinkRange.length > 0) {
-        [self resetHighLightLink];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self resetHighLightLink];
+        });
     }
 }
 
